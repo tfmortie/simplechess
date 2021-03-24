@@ -4,13 +4,11 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) add motion
     2) add motion constraints (incl. castling)
     3) add intelligence (idea: use different levels: free, low, medium, high, ...)
     4) add different modes (free -> no intelligence, just free movement, timer, etc.)
     5) improve GUI
 """
-
 import sys
 import pygame
 import argparse
@@ -60,6 +58,14 @@ def updateBoard(state, coord, screen):
                 if state[i,j] > 0:
                     screen.blit(P_SPRITE[IND_2_P[state[i,j]-1]], (start_pos_x+(j*offset), start_pos_y+(i*offset)))
 
+def isValidMousePosition(mousepos, coord):
+    if not coord[0]<=mousepos[0]<=(coord[1]+(8*coord[2])):
+        return False
+    elif not coord[1]<=mousepos[1]<=(coord[1]+(8*coord[2])):
+        return False
+    else:
+        return True
+
 def main(args):  
     # init pygame
     pygame.init()
@@ -94,10 +100,30 @@ def main(args):
     # init clock for fps
     clock = pygame.time.Clock()
     # game loop
+    coord = None
     while True:
-        # listen for quit event
+        # listen for events
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # check if L mouse button was used
+                if event.button == 1:
+                    mouseposxy = pygame.mouse.get_pos()
+                    # check which component has been selected
+                    coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
+                    # if no component has been selected, do nothing
+                    if state[coord] == 0:
+                        coord = None
+            elif event.type == pygame.MOUSEBUTTONUP and coord is not None:
+                if event.button == 1:
+                    # L mouse button released, hence, check new position and update state
+                    mouseposxy = pygame.mouse.get_pos()
+                    new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
+                    # move component in case of new position which is valid
+                    if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
+                        state[new_coord] = state[coord]
+                        state[coord] = 0 
+                        coord = None
         # set background
         screen.blit(chessbg, (0,0))
         updateBoard(state, S_OFFSET[args.size], screen)
