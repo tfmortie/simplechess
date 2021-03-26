@@ -16,6 +16,8 @@ import random
 
 import numpy as np
 
+from logic import isValidComponentPosition
+
 S_OFFSET = {
     "small": (23,14,47.5),
     "medium": (32,17,71),
@@ -66,6 +68,7 @@ def isValidMousePosition(mousepos, coord):
     else:
         return True
 
+                        
 def main(args):  
     # init pygame
     pygame.init()
@@ -121,9 +124,11 @@ def main(args):
                     new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
                     # move component in case of new position which is valid
                     if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
-                        state[new_coord] = state[coord]
-                        state[coord] = 0 
-                        coord = None
+                        # check if move is valid
+                        if isValidComponentPosition(coord, new_coord, state, gamemode):
+                            state[new_coord] = state[coord]
+                            state[coord] = 0 
+                            coord = None
         # set background
         screen.blit(chessbg, (0,0))
         updateBoard(state, S_OFFSET[args.size], screen)
