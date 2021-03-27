@@ -67,8 +67,7 @@ def isValidMousePosition(mousepos, coord):
         return False
     else:
         return True
-
-                        
+           
 def main(args):  
     # init pygame
     pygame.init()
@@ -104,6 +103,7 @@ def main(args):
     clock = pygame.time.Clock()
     # game loop
     coord = None
+    ep = None
     while True:
         # listen for events
         for event in pygame.event.get():
@@ -125,7 +125,17 @@ def main(args):
                     # move component in case of new position which is valid
                     if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
                         # check if move is valid
-                        if isValidComponentPosition(coord, new_coord, state, gamemode):
+                        if isValidComponentPosition(coord, new_coord, state, gamemode, ep):
+                            # check for double pawn move (necessary for en passant moves)
+                            if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2:
+                                ep = new_coord
+                            elif state[coord] in [1,2,7,8] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep != None:
+                                # en passant move
+                                print("En passant!")
+                                ep = None
+                            else:
+                                ep = None
+
                             state[new_coord] = state[coord]
                             state[coord] = 0 
                             coord = None
