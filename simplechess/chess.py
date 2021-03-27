@@ -131,7 +131,10 @@ def main(args):
                                 ep = new_coord
                             elif state[coord] in [1,2,7,8] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep != None:
                                 # en passant move
-                                print("En passant!")
+                                if new_coord[0] > coord[0]:
+                                    state[new_coord[0]-1,new_coord[1]] = 0
+                                else:
+                                    state[new_coord[0]+1,new_coord[1]] = 0
                                 ep = None
                             else:
                                 ep = None
