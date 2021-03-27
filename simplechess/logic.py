@@ -82,6 +82,15 @@ def getValidPositions(coord, state, orientation, ep=None):
                 break
             else:
                 break
+    elif state[coord]==3 or state[coord]==9:
+        # knight logic
+        for i in [-2,-1,1,2]:
+            ji = (1 if abs(i)==2 else 2)
+            for j in [ji, -1*ji]:
+                if 0<=coord[0]+i<=7 and 0<=coord[1]+j<=7 and (state[coord]//7!=state[coord[0]+i,coord[1]+j]//7 or state[coord[0]+i,coord[1]+j]==0):
+                    moves.append((coord[0]+i,coord[1]+j))
+    elif state[coord]==4 or state[coord]==10:
+        # bishop logic
     else:
         moves = list(itertools.product(range(8),range(8))) 
 
