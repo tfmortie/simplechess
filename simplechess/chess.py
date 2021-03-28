@@ -4,10 +4,9 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    2) add motion constraints (incl. castling)
-    3) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    4) add different modes (free -> no intelligence, just free movement, timer, etc.)
-    5) improve GUI
+    1) add intelligence (idea: use different levels: free, low, medium, high, ...)
+    2) add different modes (free -> no intelligence, just free movement, timer, etc.)
+    3) improve GUI
 """
 import sys
 import pygame
@@ -104,6 +103,7 @@ def main(args):
     # game loop
     coord = None
     ep = None
+    castle = [False]*6
     while True:
         # listen for events
         for event in pygame.event.get():
@@ -125,11 +125,11 @@ def main(args):
                     # move component in case of new position which is valid
                     if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
                         # check if move is valid
-                        if isValidComponentPosition(coord, new_coord, state, gamemode, ep):
-                            # check for double pawn move (necessary for en passant moves)
-                            if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2:
+                        if isValidComponentPosition(coord, new_coord, state, gamemode, ep, castle):
+                            # checks for double pawn or en passant 
+                            if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2 and state[coord] in [1,7]:
                                 ep = new_coord
-                            elif state[coord] in [1,2,7,8] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep!=None:
+                            elif state[coord] in [1,7] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep!=None:
                                 # en passant move
                                 if new_coord[0] > coord[0]:
                                     state[new_coord[0]-1,new_coord[1]] = 0
@@ -138,7 +138,30 @@ def main(args):
                                 ep = None
                             else:
                                 ep = None
-
+                            # check whether we have a rook or king move
+                            if state[coord] in [2,8]:
+                                if coord==(0,0):
+                                    castle[0]=True
+                                elif coord==(0,7):
+                                    castle[2]=True
+                                elif coord==(7,0):
+                                    castle[3]=True
+                                elif coord==(7,7):
+                                    castle[5]=True
+                            if state[coord] in [6,12]:
+                                if (coord==(0,4) and state[coord]==6) or (coord==(0,3) and state[coord]==12):
+                                    castle[1]=True
+                                elif (coord==(7,3) and state[coord]==6) or (coord==(7,4) and state[coord]==12):
+                                    castle[4]=True
+                                # check if castled -> change rooks
+                                if abs(coord[1]-new_coord[1])==2:
+                                    # check if W or E
+                                    if coord[1]<new_coord[1]:
+                                        state[new_coord[0],new_coord[1]-1] = state[coord[0],7]
+                                        state[coord[0],7] = 0
+                                    else:
+                                        state[new_coord[0],new_coord[1]+1] = state[coord[0],0]
+                                        state[coord[0],0] = 0
                             state[new_coord] = state[coord]
                             state[coord] = 0 
                             coord = None

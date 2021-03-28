@@ -5,9 +5,11 @@ Date: March 2021
 """
 import itertools
 
-def isValidComponentPosition(coord, new_coord, state, orientation, ep):
+import numpy as np
+
+def isValidComponentPosition(coord, new_coord, state, orientation, ep, castle):
     # get all possible valid moves for component
-    moves = getValidPositions(coord, state, orientation, ep)
+    moves = getValidPositions(coord, state, orientation, ep, castle)
     if new_coord in moves:
         return True
     else: 
@@ -97,7 +99,7 @@ def getValidPositionsDiagonal(coord, state):
             break
     return moves
 
-def getValidPositions(coord, state, orientation, ep=None):
+def getValidPositions(coord, state, orientation, ep=None, castle=None):
     moves = []
     if state[coord]==1 or state[coord]==7:
         # pawn logic
@@ -144,8 +146,41 @@ def getValidPositions(coord, state, orientation, ep=None):
         # queen logic
         moves.extend(getValidPositionsDiagonal(coord, state))
         moves.extend(getValidPositionsHorizontal(coord, state))
-        moves.extend(getValidPositionsVertical(coord, state))
+        moves.extend(getValidPositionsVertical(coord, state))    
     else:
-        moves = list(itertools.product(range(8),range(8))) 
-
+        # king logic
+        for ox in [-1,0,1]:
+            for oy in [-1,0,1]:
+                if not(ox==0 and oy==0):
+                    if 0<=coord[0]+ox<=7 and 0<=coord[1]+oy<=7 and (state[coord]//7!=state[coord[0]+ox,coord[1]+oy]//7 or state[coord[0]+ox,coord[1]+oy]==0):
+                        moves.append((coord[0]+ox,coord[1]+oy))
+        # now also check whether castling is allowed
+        if castle is not None:
+            if coord[0]==0 or coord[0]==7:
+                # W
+                if castle[(1 if coord[0]==0 else 4)]!=True and castle[(0 if coord[0]==0 else 3)]!=True:
+                    if np.all(state[coord[0],1:coord[1]]==0) and not isAttacked([(coord[0],coord[1]-j) for j in range(3)],state,("white" if state[coord]<7 else "black"), orientation):
+                        moves.append((coord[0],coord[1]-2))
+                # E
+                if castle[(1 if coord[0]==0 else 4)]!=True and castle[(2 if coord[0]==0 else 5)]!=True:
+                    if np.all(state[coord[0],coord[1]+1:7]==0) and not isAttacked([(coord[0],coord[1]+j) for j in range(3)],state,("white" if state[coord]<7 else "black"), orientation):
+                        moves.append((coord[0],coord[1]+2))
     return moves
+
+def isAttacked(pos, state, attacker, orientation):
+    attacked = False
+    for i in range(8):
+        for j in range(8):
+            # check if we have a component of the attacker
+            if state[i,j]//7==(0 if attacker=="black" else 1) and state[i,j]!=0:
+                # check if the current component attacks any of the positions in pos
+                att_pos = getValidPositions((i,j), state, orientation, None, None)
+                for p in pos:
+                    if p in att_pos:
+                        attacked=True
+                        break
+                if attacked:
+                    break
+        if attacked:
+            break
+    return attacked
