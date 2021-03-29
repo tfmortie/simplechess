@@ -11,7 +11,10 @@ def isValidComponentPosition(coord, new_coord, state, orientation, ep, castle):
     # get all possible valid moves for component
     moves = getValidPositions(coord, state, orientation, ep, castle)
     if new_coord in moves:
-        return True
+        if not isCheck(coord, new_coord, state, orientation):
+            return True
+        else:
+            return False
     else: 
         return False
 
@@ -184,3 +187,13 @@ def isAttacked(pos, state, attacker, orientation):
         if attacked:
             break
     return attacked
+
+def isCheck(coord, new_coord, state, orientation):
+    # create snapshot of state after new move
+    new_state = np.copy(state) 
+    new_state[new_coord] = state[coord]
+    new_state[coord] = 0
+    # find position of king
+    pos_king = [c[0] for c in np.where(new_state==6*((state[coord]//7)+1))]
+    # check if attacked
+    return isAttacked([tuple(pos_king)], new_state, ("white" if state[coord]//7==0 else "black"), orientation)
