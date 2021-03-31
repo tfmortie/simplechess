@@ -4,18 +4,22 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    2) add different modes (free -> no intelligence, just free movement, timer, etc.)
-    3) improve GUI
+    1) make sure to handle checkmate situations + fast move selection in case of check 
+    2) add clock and different clock modes
+    3) show current score (ie total score of components captured)
+    4) add intelligence (idea: use different levels: free, low, medium, high, ...)
+    5) improve GUI
 """
 import sys
 import pygame
 import argparse
 import random
+import time # TODO: remove
 
 import numpy as np
 
 from logic import isValidComponentPosition
+from engine import getRandomMove
 
 S_OFFSET = {
     "small": (23,14,47.5),
@@ -66,6 +70,66 @@ def isValidMousePosition(mousepos, coord):
         return False
     else:
         return True
+
+def applyMove(coord, new_coord, state, gamemode, ep, castle, opponent=False):
+    moved = False
+    # check if move is valid
+    valid_move = False
+    if opponent:
+        valid_move = True
+    else:
+        valid_move = isValidComponentPosition(coord, new_coord, state, gamemode, ep, castle)
+    if valid_move:
+        # checks for double pawn or en passant 
+        if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2 and state[coord] in [1,7]:
+            ep = new_coord
+        elif state[coord] in [1,7] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep!=None:
+            # en passant move
+            if new_coord[0] > coord[0]:
+                state[new_coord[0]-1,new_coord[1]] = 0
+            else:
+                state[new_coord[0]+1,new_coord[1]] = 0
+            ep = None
+        else:
+            ep = None
+        # check whether we have a rook or king move
+        if state[coord] in [2,8]:
+            if coord==(0,0):
+                castle[0]=True
+            elif coord==(0,7):
+                castle[2]=True
+            elif coord==(7,0):
+                castle[3]=True
+            elif coord==(7,7):
+                castle[5]=True
+        if state[coord] in [6,12]:
+            if (coord==(0,4) and state[coord]==6) or (coord==(0,3) and state[coord]==12):
+                castle[1]=True
+            elif (coord==(7,3) and state[coord]==6) or (coord==(7,4) and state[coord]==12):
+                castle[4]=True
+            # check if castled -> change rooks
+            if abs(coord[1]-new_coord[1])==2:
+                # check if W or E
+                if coord[1]<new_coord[1]:
+                    state[new_coord[0],new_coord[1]-1] = state[coord[0],7]
+                    state[coord[0],7] = 0
+                else:
+                    state[new_coord[0],new_coord[1]+1] = state[coord[0],0]
+                    state[coord[0],0] = 0
+        state[new_coord] = state[coord]
+        state[coord] = 0 
+        coord = None
+        moved = True
+    return ep, coord, moved
+
+def drawBoard(state, screen, chessbg, offs, clock):
+    # set background
+    screen.blit(chessbg, (0,0))
+    updateBoard(state, S_OFFSET[args.size], screen)
+    # update screen
+    pygame.display.update()
+    # wait fps seconds
+    clock.tick(args.fps)
            
 def main(args):  
     # init pygame
@@ -101,77 +165,43 @@ def main(args):
     # init clock for fps
     clock = pygame.time.Clock()
     # game loop
+    moved = False
     coord = None
     ep = None
     castle = [False]*6
-    while True:
-        # listen for events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # check if L mouse button was used
-                if event.button == 1:
-                    mouseposxy = pygame.mouse.get_pos()
-                    # check which component has been selected
-                    coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
-                    # if no component has been selected, do nothing
-                    if state[coord] == 0:
-                        coord = None
-            elif event.type == pygame.MOUSEBUTTONUP and coord is not None:
-                if event.button == 1:
-                    # L mouse button released, hence, check new position and update state
-                    mouseposxy = pygame.mouse.get_pos()
-                    new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
-                    # move component in case of new position which is valid
-                    if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
-                        # check if move is valid
-                        if isValidComponentPosition(coord, new_coord, state, gamemode, ep, castle):
-                            # checks for double pawn or en passant 
-                            if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2 and state[coord] in [1,7]:
-                                ep = new_coord
-                            elif state[coord] in [1,7] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep!=None:
-                                # en passant move
-                                if new_coord[0] > coord[0]:
-                                    state[new_coord[0]-1,new_coord[1]] = 0
-                                else:
-                                    state[new_coord[0]+1,new_coord[1]] = 0
-                                ep = None
-                            else:
-                                ep = None
-                            # check whether we have a rook or king move
-                            if state[coord] in [2,8]:
-                                if coord==(0,0):
-                                    castle[0]=True
-                                elif coord==(0,7):
-                                    castle[2]=True
-                                elif coord==(7,0):
-                                    castle[3]=True
-                                elif coord==(7,7):
-                                    castle[5]=True
-                            if state[coord] in [6,12]:
-                                if (coord==(0,4) and state[coord]==6) or (coord==(0,3) and state[coord]==12):
-                                    castle[1]=True
-                                elif (coord==(7,3) and state[coord]==6) or (coord==(7,4) and state[coord]==12):
-                                    castle[4]=True
-                                # check if castled -> change rooks
-                                if abs(coord[1]-new_coord[1])==2:
-                                    # check if W or E
-                                    if coord[1]<new_coord[1]:
-                                        state[new_coord[0],new_coord[1]-1] = state[coord[0],7]
-                                        state[coord[0],7] = 0
-                                    else:
-                                        state[new_coord[0],new_coord[1]+1] = state[coord[0],0]
-                                        state[coord[0],0] = 0
-                            state[new_coord] = state[coord]
-                            state[coord] = 0 
+    while True: 
+        drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+        if gamemode == "black":
+            time.sleep(1)
+            comp, pos = getRandomMove("white", state, gamemode, ep, castle) 
+            ep, coord, _ = applyMove(comp, pos, state, gamemode, ep, castle, True)
+            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+        while not moved:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # check if L mouse button was used
+                    if event.button == 1:
+                        mouseposxy = pygame.mouse.get_pos()
+                        # check which component has been selected
+                        coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
+                        # if no component has been selected, do nothing
+                        if state[coord] == 0:
                             coord = None
-        # set background
-        screen.blit(chessbg, (0,0))
-        updateBoard(state, S_OFFSET[args.size], screen)
-        # update screen
-        pygame.display.update()
-        # wait fps seconds
-        clock.tick(args.fps)
+                elif event.type == pygame.MOUSEBUTTONUP and coord is not None:
+                    if event.button == 1:
+                        # L mouse button released, hence, check new position and update state
+                        mouseposxy = pygame.mouse.get_pos()
+                        new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
+                        # move component in case of new position which is valid
+                        if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
+                            ep, coord, moved = applyMove(coord, new_coord, state, gamemode, ep, castle, False)
+            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+        moved = False
+        if gamemode == "white":
+            time.sleep(1)
+            comp, pos = getRandomMove("black", state, gamemode, ep, castle) 
+            ep, coord, _ = applyMove(comp, pos, state, gamemode, ep, castle, True)
     # end game
     pygame.quit()
 

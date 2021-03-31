@@ -197,3 +197,11 @@ def isCheck(coord, new_coord, state, orientation):
     pos_king = [c[0] for c in np.where(new_state==6*((state[coord]//7)+1))]
     # check if attacked
     return isAttacked([tuple(pos_king)], new_state, ("white" if state[coord]//7==0 else "black"), orientation)
+
+def getComponents(color, state):
+    components = []
+    for i in range(8):
+        for j in range(8):
+            if state[i,j]//7==(0 if color=="black" else 1) and state[i,j]!=0:
+                components.append((i,j))
+    return components
