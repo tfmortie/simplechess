@@ -5,9 +5,8 @@ Date: March 2021
 
 TODO: 
     1) add clock and different clock modes
-    2) show current score (ie total score of components captured)
-    3) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    4) improve GUI (eg. logging and messaging via GUI instead of console)
+    2) add intelligence (idea: use different levels: free, low, medium, high, ...)
+    3) improve GUI (eg. logging and messaging via GUI instead of console)
 """
 import sys
 import pygame
@@ -21,6 +20,7 @@ import numpy as np
 
 from logic import isValidComponentPosition, isChecked, isStalemated
 from engine import getRandomMove, getRandomPromotion
+from threading import Timer
 
 S_OFFSET = {
     "small": (23,14,47.5),
@@ -40,6 +40,37 @@ S_PSIZE = {
 IND_2_P = ["bpawn", "brook", "bknight", "bbishop", "bqueen", "bking", "wpawn", "wrook", "wknight", "wbishop", "wqueen", "wking"]
 
 P_SPRITE = {}
+
+class Clock:
+    def __init__(self, timeout, callback):
+        self.timer = Timer(timeout, callback)
+        self.start_time = None
+        self.cancel_time = None
+        self.timeout = timeout
+        self.callback = callback
+
+    def cancel(self):
+        self.timer.cancel()
+
+    def start(self):
+        self.start_time = time.time()
+        self.timer.start()
+
+    def pause(self):
+        self.cancel_time = time.time()
+        self.cancel()
+
+    def resume(self):
+        self.timeout = self.get_remaining_time()
+        self.timer = Timer(self.timeout, self.callback)
+        self.start_time = time.time()
+        self.timer.start()
+
+    def get_remaining_time(self):
+        if self.cancel_time is not None and self.start_time is not None:
+            return self.timeout - (self.cancel_time - self.start_time)
+        else:
+            return self.timeout - (time.time() - self.start_time)
 
 def initSprites(args):
     global P_SPRITE
@@ -72,7 +103,7 @@ def isValidMousePosition(mousepos, coord):
     else:
         return True
 
-def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
+def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=False):
     poption = None
     moved = False
     # check if move is valid
@@ -133,6 +164,26 @@ def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
                 else:
                     state[new_coord[0],new_coord[1]+1] = state[coord[0],0]
                     state[coord[0],0] = 0
+        # check if piece is captured
+        if state[new_coord] != 0:
+            # get points
+            points = 0
+            if state[new_coord] in [1,7]:
+                points = 1
+            elif state[new_coord] in [2,8]:
+                points = 5
+            elif state[new_coord] in [5,11]:
+                points = 9
+            else:
+                points = 3
+            if opponent:
+                score[1] += points
+            else:
+                score[0] += points
+            if orientation=="black":
+                logging.info("Black = {0}       White = {1}".format(score[0], score[1]))
+            else:
+                logging.info("White = {0}       Black = {1}".format(score[0], score[1]))
         if poption is not None:
             if poption==0:
                 state[new_coord] = 4+((state[coord]//7)*6)
@@ -172,8 +223,8 @@ def checkGameEvent(color, state, orientation, ep, castle):
     elif checked and stalemated:
         logging.info('Checkmate! Player {0} has won!'.format(("white" if color=="black" else "black")))
         input("Press any key to exit game...")
-        sys.exit()
- 
+        sys.exit() 
+
 def main(args):  
     # init pygame
     pygame.init()
@@ -208,24 +259,32 @@ def main(args):
     # init clock for fps
     clock = pygame.time.Clock()
     # game loop
+    score = [0, 0]
     moved = False
     coord = (-1,-1)
     ep = None
     castle = [False]*6
     # draw initial board
     drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
-    while True: 
+    test_clock = Clock(5*60, None)
+    test_clock.start()
+    while True:   
         if orientation == "black":
             if coord != (-1,-1):
                 time.sleep(1)
             comp, pos = getRandomMove("white", state, orientation, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, orientation, ep, castle, True)
+            ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
             # check for game event
             checkGameEvent("black", state, orientation, ep, castle)
         while not moved:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: sys.exit()
+                sys.stdout.write("\r")
+                sys.stdout.write("Timer {0}".format(time.strftime('%H:%M:%S', time.gmtime(test_clock.get_remaining_time())))) 
+                sys.stdout.flush()
+                if event.type == pygame.QUIT: 
+                    test_clock.cancel()
+                    sys.exit();
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # check if L mouse button was used
                     if event.button == 1:
@@ -242,7 +301,7 @@ def main(args):
                         new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
                         # move component in case of new position which is valid
                         if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
-                            ep, coord, moved = applyMove(coord, new_coord, state, orientation, ep, castle, False)
+                            ep, coord, moved = applyMove(coord, new_coord, state, score, orientation, ep, castle, False)
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
             # check for game event
             checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
@@ -250,11 +309,12 @@ def main(args):
         if orientation == "white":
             time.sleep(1)
             comp, pos = getRandomMove("black", state, orientation, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, orientation, ep, castle, True)
+            ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
             # check for game event
             checkGameEvent("white", state, orientation, ep, castle)
     # end game
+    test_clock.cancel()
     pygame.quit()
 
 if __name__=='__main__':
