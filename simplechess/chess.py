@@ -4,7 +4,7 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) pawn promotion
+    1) complete pawn promotion for opponent and player
     2) add clock and different clock modes
     3) show current score (ie total score of components captured)
     4) add intelligence (idea: use different levels: free, low, medium, high, ...)
@@ -21,7 +21,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logg
 import numpy as np
 
 from logic import isValidComponentPosition, isChecked, isStalemated
-from engine import getRandomMove
+from engine import getRandomMove, getRandomPromotion
 
 S_OFFSET = {
     "small": (23,14,47.5),
@@ -74,6 +74,7 @@ def isValidMousePosition(mousepos, coord):
         return True
 
 def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
+    poption = None
     moved = False
     # check if move is valid
     valid_move = False
@@ -94,6 +95,21 @@ def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
             ep = None
         else:
             ep = None
+        # check for pawn promotion
+        if coord[0]!=new_coord[0] and state[coord] in [1,7] and (new_coord[0]==0 or new_coord[0]==7):
+            if opponent:
+                poption = getRandomPromotion(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
+            else:
+                while True:
+                    logging.info("Pawn promotion! Enter option (0=bishop, 1=knight, 2=rook, 3=queen) and press any key to continue...")
+                    try:
+                        poption = int(input(""))
+                        if poption not in [0,1,2,3]:
+                            raise ValueError()
+                        else:
+                            break
+                    except Exception as e:
+                        logging.info("Invalid option!")
         # check whether we have a rook or king move
         if state[coord] in [2,8]:
             if coord==(0,0):
@@ -118,7 +134,17 @@ def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
                 else:
                     state[new_coord[0],new_coord[1]+1] = state[coord[0],0]
                     state[coord[0],0] = 0
-        state[new_coord] = state[coord]
+        if poption is not None:
+            if poption==0:
+                state[new_coord] = 4+((state[coord]//7)*6)
+            elif poption==1:
+                state[new_coord] = 3+((state[coord]//7)*6)   
+            elif poption==2:
+                state[new_coord] = 2+((state[coord]//7)*6)   
+            else:
+                state[new_coord] = 5+((state[coord]//7)*6)   
+        else:
+            state[new_coord] = state[coord]
         state[coord] = 0 
         coord = None
         moved = True

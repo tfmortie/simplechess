@@ -27,4 +27,6 @@ def getRandomMove(color, state, orientation, ep, castle):
             break
     return comp, pos
 
-
+def getRandomPromotion(color, state, orientation, ep, castle):
+    # just pick a random option from {0,1,2,3}
+    return random.choice([0,1,2,3])
