@@ -205,3 +205,28 @@ def getComponents(color, state):
             if state[i,j]//7==(0 if color=="black" else 1) and state[i,j]!=0:
                 components.append((i,j))
     return components
+
+def isChecked(color, state, orientation, ep, castle):
+    # get position of color's king
+    pos_king = [c[0] for c in np.where(state==(6 if color=="black" else 12))]
+    # check if this position is attacked
+    check = isAttacked([tuple(pos_king)], state, ("white" if color=="black" else "black"), orientation)
+    return check
+
+def isStalemated(color, state, orientation, ep, castle):
+    stalemate = True
+    # get components and shuffle
+    comps = getComponents(color, state)
+    # run over components
+    for c in comps:
+        # get valid positions 
+        c_pos = getValidPositions(c, state, orientation, ep, castle)
+        # do we have options?
+        if len(c_pos) > 0:
+            for p in c_pos:
+                if not isCheck(c, p, state, orientation):
+                    stalemate = False
+                    break
+        if not stalemate:
+            break
+    return stalemate

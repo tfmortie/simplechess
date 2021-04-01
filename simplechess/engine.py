@@ -9,15 +9,22 @@ from logic import getComponents, getValidPositions, isCheck
 
 def getRandomMove(color, state, orientation, ep, castle):
     comp, pos = None, None
-    while pos is None:
-        # pick random component
-        comp = random.choice(getComponents(color, state))
-        # get valid positions
-        comp_pos = getValidPositions(comp, state, orientation, ep, castle)
-        if len(comp_pos) > 1:
-            pos = random.choice(comp_pos)
-            if isCheck(comp, pos, state, orientation):
-                comp, pos = None, None
-
+    # get components and shuffle
+    comps = getComponents(color, state)
+    random.shuffle(comps)
+    # run over components
+    for c in comps:
+        # get valid positions and shuffle
+        c_pos = getValidPositions(c, state, orientation, ep, castle)
+        random.shuffle(c_pos)
+        # do we have options?
+        if len(c_pos) > 0:
+            for p in c_pos:
+                if not isCheck(c, p, state, orientation):
+                    comp, pos = c, p
+                    break
+        if comp is not None and pos is not None:
+            break
     return comp, pos
+
 

@@ -4,21 +4,23 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) make sure to handle checkmate situations + fast move selection in case of check 
+    1) pawn promotion
     2) add clock and different clock modes
     3) show current score (ie total score of components captured)
     4) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    5) improve GUI
+    5) improve GUI (eg. logging and messaging via GUI instead of console)
 """
 import sys
 import pygame
 import argparse
 import random
-import time # TODO: remove
+import time
+import logging
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
 
 import numpy as np
 
-from logic import isValidComponentPosition
+from logic import isValidComponentPosition, isChecked, isStalemated
 from engine import getRandomMove
 
 S_OFFSET = {
@@ -71,14 +73,14 @@ def isValidMousePosition(mousepos, coord):
     else:
         return True
 
-def applyMove(coord, new_coord, state, gamemode, ep, castle, opponent=False):
+def applyMove(coord, new_coord, state, orientation, ep, castle, opponent=False):
     moved = False
     # check if move is valid
     valid_move = False
     if opponent:
         valid_move = True
     else:
-        valid_move = isValidComponentPosition(coord, new_coord, state, gamemode, ep, castle)
+        valid_move = isValidComponentPosition(coord, new_coord, state, orientation, ep, castle)
     if valid_move:
         # checks for double pawn or en passant 
         if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2 and state[coord] in [1,7]:
@@ -130,7 +132,23 @@ def drawBoard(state, screen, chessbg, offs, clock):
     pygame.display.update()
     # wait fps seconds
     clock.tick(args.fps)
-           
+
+def checkGameEvent(color, state, orientation, ep, castle):
+    # is checked?
+    checked = isChecked(color, state, orientation, ep, castle)
+    # is stalemated?
+    stalemated = isStalemated(color, state, orientation, ep, castle)
+    if checked and not stalemated:
+        logging.info('King {0} is checked!'.format(color))
+    elif not checked and stalemated:
+        logging.info('King {0} is stalemated! Draw!'.format(color))
+        input("Press any key to exit game...")
+        sys.exit()
+    elif checked and stalemated:
+        logging.info('Checkmate! Player {0} has won!'.format(("white" if color=="black" else "black")))
+        input("Press any key to exit game...")
+        sys.exit()
+ 
 def main(args):  
     # init pygame
     pygame.init()
@@ -139,11 +157,11 @@ def main(args):
     pygame.display.set_caption("Simple Chess")
     # init background and state
     state = np.zeros((8,8),dtype=np.int)
-    gamemode = args.colour
-    if gamemode == "random":
+    orientation = args.colour
+    if orientation == "random":
         m = random.choice(["w","b"])
-        gamemode = "white" if m=="w" else "black"
-    if gamemode == "black":
+        orientation = "white" if m=="w" else "black"
+    if orientation == "black":
         chessbg = pygame.image.load("assets/backgroundb.png")
         # init pawns
         state[6,:] = np.ones(8)
@@ -166,16 +184,20 @@ def main(args):
     clock = pygame.time.Clock()
     # game loop
     moved = False
-    coord = None
+    coord = (-1,-1)
     ep = None
     castle = [False]*6
+    # draw initial board
+    drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
     while True: 
-        drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
-        if gamemode == "black":
-            time.sleep(1)
-            comp, pos = getRandomMove("white", state, gamemode, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, gamemode, ep, castle, True)
+        if orientation == "black":
+            if coord != (-1,-1):
+                time.sleep(1)
+            comp, pos = getRandomMove("white", state, orientation, ep, castle) 
+            ep, coord, _ = applyMove(comp, pos, state, orientation, ep, castle, True)
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+            # check for game event
+            checkGameEvent("black", state, orientation, ep, castle)
         while not moved:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: sys.exit()
@@ -195,13 +217,18 @@ def main(args):
                         new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
                         # move component in case of new position which is valid
                         if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
-                            ep, coord, moved = applyMove(coord, new_coord, state, gamemode, ep, castle, False)
+                            ep, coord, moved = applyMove(coord, new_coord, state, orientation, ep, castle, False)
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+            # check for game event
+            checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
         moved = False
-        if gamemode == "white":
+        if orientation == "white":
             time.sleep(1)
-            comp, pos = getRandomMove("black", state, gamemode, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, gamemode, ep, castle, True)
+            comp, pos = getRandomMove("black", state, orientation, ep, castle) 
+            ep, coord, _ = applyMove(comp, pos, state, orientation, ep, castle, True)
+            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+            # check for game event
+            checkGameEvent("white", state, orientation, ep, castle)
     # end game
     pygame.quit()
 
@@ -211,6 +238,6 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description="Simple Chess") 
     parser.add_argument("-s", "--size", dest='size', default="medium", choices=screensize)
     parser.add_argument("-c", "--colour", dest="colour", default="random", choices=colour)
-    parser.add_argument("-f", "--fps", dest="fps", type=int, default=30)
+    parser.add_argument("-f", "--fps", dest="fps", type=int, default=60)
     args = parser.parse_args()
     main(args)
