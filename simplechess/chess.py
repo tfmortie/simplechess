@@ -4,11 +4,10 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) complete pawn promotion for opponent and player
-    2) add clock and different clock modes
-    3) show current score (ie total score of components captured)
-    4) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    5) improve GUI (eg. logging and messaging via GUI instead of console)
+    1) add clock and different clock modes
+    2) show current score (ie total score of components captured)
+    3) add intelligence (idea: use different levels: free, low, medium, high, ...)
+    4) improve GUI (eg. logging and messaging via GUI instead of console)
 """
 import sys
 import pygame
