@@ -4,17 +4,17 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) add clock and different clock modes
+    1) improve logging
     2) add intelligence (idea: use different levels: free, low, medium, high, ...)
     3) improve GUI (eg. logging and messaging via GUI instead of console)
 """
 import sys
+import os
 import pygame
 import argparse
 import random
 import time
-import logging
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+import threading
 
 import numpy as np
 
@@ -42,12 +42,13 @@ IND_2_P = ["bpawn", "brook", "bknight", "bbishop", "bqueen", "bking", "wpawn", "
 P_SPRITE = {}
 
 class Clock:
-    def __init__(self, timeout, callback):
-        self.timer = Timer(timeout, callback)
+    def __init__(self, timeout, callback, args):
+        self.timer = Timer(timeout, callback, args)
         self.start_time = None
         self.cancel_time = None
         self.timeout = timeout
         self.callback = callback
+        self.args = args
 
     def cancel(self):
         self.timer.cancel()
@@ -62,15 +63,22 @@ class Clock:
 
     def resume(self):
         self.timeout = self.get_remaining_time()
-        self.timer = Timer(self.timeout, self.callback)
+        self.timer = Timer(self.timeout, self.callback, self.args)
         self.start_time = time.time()
         self.timer.start()
+        self.cancel_time = None
 
     def get_remaining_time(self):
         if self.cancel_time is not None and self.start_time is not None:
             return self.timeout - (self.cancel_time - self.start_time)
         else:
             return self.timeout - (time.time() - self.start_time)
+
+def logConsole(s):
+    sys.stdout.write('    ')
+    sys.stdout.write(s)
+    sys.stdout.write('\n')
+    sys.stdout.flush()
 
 def initSprites(args):
     global P_SPRITE
@@ -131,7 +139,7 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
                 poption = getRandomPromotion(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
             else:
                 while True:
-                    logging.info("Pawn promotion! Enter option (0=bishop, 1=knight, 2=rook, 3=queen) and press any key to continue...")
+                    logConsole("Pawn promotion! Enter option (0=bishop, 1=knight, 2=rook, 3=queen) and press any key to continue...")
                     try:
                         poption = int(input(""))
                         if poption not in [0,1,2,3]:
@@ -139,7 +147,7 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
                         else:
                             break
                     except Exception as e:
-                        logging.info("Invalid option!")
+                        logConsole("Invalid option!")
         # check whether we have a rook or king move
         if state[coord] in [2,8]:
             if coord==(0,0):
@@ -181,9 +189,9 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
             else:
                 score[0] += points
             if orientation=="black":
-                logging.info("Black = {0}       White = {1}".format(score[0], score[1]))
+                logConsole("Black = {0}          White = {1}".format(score[0], score[1]))
             else:
-                logging.info("White = {0}       Black = {1}".format(score[0], score[1]))
+                logConsole("White = {0}          Black = {1}".format(score[0], score[1]))
         if poption is not None:
             if poption==0:
                 state[new_coord] = 4+((state[coord]//7)*6)
@@ -215,13 +223,13 @@ def checkGameEvent(color, state, orientation, ep, castle):
     # is stalemated?
     stalemated = isStalemated(color, state, orientation, ep, castle)
     if checked and not stalemated:
-        logging.info('King {0} is checked!'.format(color))
+        logConsole('King {0} is checked!'.format(color))
     elif not checked and stalemated:
-        logging.info('King {0} is stalemated! Draw!'.format(color))
+        logConsole('King {0} is stalemated! Draw!'.format(color))
         input("Press any key to exit game...")
         sys.exit()
     elif checked and stalemated:
-        logging.info('Checkmate! Player {0} has won!'.format(("white" if color=="black" else "black")))
+        logConsole('Checkmate! Player {0} has won!'.format(("white" if color=="black" else "black")))
         input("Press any key to exit game...")
         sys.exit() 
 
@@ -266,8 +274,18 @@ def main(args):
     castle = [False]*6
     # draw initial board
     drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
-    test_clock = Clock(5*60, None)
-    test_clock.start()
+    timer_player_exceeded = threading.Event()
+    timer_opponent_exceeded = threading.Event()
+    clock_player = Clock(args.timeout*60, lambda x: x.set(), [timer_player_exceeded])
+    clock_opponent = Clock(args.timeout*60, lambda x: x.set(), [timer_opponent_exceeded])
+    if orientation=="black":
+        clock_opponent.start()
+        clock_player.start()
+        clock_player.pause()
+    else:
+        clock_player.start()
+        clock_opponent.start()
+        clock_opponent.pause()
     while True:   
         if orientation == "black":
             if coord != (-1,-1):
@@ -277,13 +295,18 @@ def main(args):
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
             # check for game event
             checkGameEvent("black", state, orientation, ep, castle)
-        while not moved:
+            clock_opponent.pause()
+            clock_player.resume()
+        while not moved and not timer_opponent_exceeded.is_set() and not timer_player_exceeded.is_set():
+            sys.stdout.write('\r')
+            time_rem_player = time.strftime('%H:%M:%S', time.gmtime(clock_player.get_remaining_time())) 
+            time_rem_opponent = time.strftime('%H:%M:%S', time.gmtime(clock_opponent.get_remaining_time())) 
+            sys.stdout.write("clock player : {0}        clock opponent : {1}".format(time_rem_player, time_rem_opponent)) 
+            sys.stdout.flush()
             for event in pygame.event.get():
-                sys.stdout.write("\r")
-                sys.stdout.write("Timer {0}".format(time.strftime('%H:%M:%S', time.gmtime(test_clock.get_remaining_time())))) 
-                sys.stdout.flush()
                 if event.type == pygame.QUIT: 
-                    test_clock.cancel()
+                    clock_player.cancel()
+                    clock_opponent.cancel()
                     sys.exit();
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # check if L mouse button was used
@@ -305,22 +328,41 @@ def main(args):
             drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
             # check for game event
             checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
-        moved = False
-        if orientation == "white":
-            time.sleep(1)
-            comp, pos = getRandomMove("black", state, orientation, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
-            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
-            # check for game event
-            checkGameEvent("white", state, orientation, ep, castle)
+        # check if loop was terminated due to exceeded timers
+        if timer_player_exceeded.is_set():
+            clock_opponent.cancel()
+            clock_player.cancel()
+            logConsole('King {0} won in time!'.format(("white" if orientation=="black" else "black")))
+            input("Press any key to exit game...")
+            sys.exit()
+        elif timer_opponent_exceeded.is_set():
+            clock_opponent.cancel()
+            clock_player.cancel()
+            logConsole('King {0} won in time!'.format(orientation))
+            input("Press any key to exit game...")
+            sys.exit()
+        else:
+            # pause timer of player
+            clock_player.pause()
+            clock_opponent.resume()
+            moved = False
+            if orientation == "white":
+                time.sleep(1)
+                comp, pos = getRandomMove("black", state, orientation, ep, castle) 
+                ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
+                drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+                # check for game event
+                checkGameEvent("white", state, orientation, ep, castle)
+                clock_opponent.pause()
+                clock_player.resume()
     # end game
-    test_clock.cancel()
     pygame.quit()
 
 if __name__=='__main__':
     screensize = ["small", "medium", "large"]
     colour = ["black", "white", "random"]
     parser = argparse.ArgumentParser(description="Simple Chess") 
+    parser.add_argument("-t", "--timer", dest="timeout", type=int, default=10)
     parser.add_argument("-s", "--size", dest='size', default="medium", choices=screensize)
     parser.add_argument("-c", "--colour", dest="colour", default="random", choices=colour)
     parser.add_argument("-f", "--fps", dest="fps", type=int, default=60)
