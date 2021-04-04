@@ -4,9 +4,8 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) improve logging
-    2) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    3) improve GUI (eg. logging and messaging via GUI instead of console)
+    1) add intelligence (idea: use different levels: free, low, medium, high, ...)
+    2) improve GUI (eg. logging and messaging via GUI instead of console)
 """
 import sys
 import os
@@ -19,13 +18,13 @@ import threading
 import numpy as np
 
 from logic import isValidComponentPosition, isChecked, isStalemated
-from engine import getRandomMove, getRandomPromotion
+from engine import RandomEngine
 from threading import Timer
 
 S_OFFSET = {
-    "small": (23,14,47.5),
-    "medium": (32,17,71),
-    "large": (45,25,95)}
+    "small": (23,47,47.5),
+    "medium": (34,67,71),
+    "large": (45,91,95)}
 
 S_SIZE = {
     "small": (400,400),
@@ -36,6 +35,12 @@ S_PSIZE = {
     "small": (30,30),
     "medium": (50,50),
     "large": (65,65)}
+
+S_TEXTSIZE = {
+    "small": (15, 2, 10),
+    "medium": (24, 5, 13),
+    "large": (32, 8, 16)
+}
 
 IND_2_P = ["bpawn", "brook", "bknight", "bbishop", "bqueen", "bking", "wpawn", "wrook", "wknight", "wbishop", "wqueen", "wking"]
 
@@ -75,7 +80,6 @@ class Clock:
             return self.timeout - (time.time() - self.start_time)
 
 def logConsole(s):
-    sys.stdout.write('    ')
     sys.stdout.write(s)
     sys.stdout.write('\n')
     sys.stdout.flush()
@@ -111,7 +115,7 @@ def isValidMousePosition(mousepos, coord):
     else:
         return True
 
-def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=False):
+def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent, engine):
     poption = None
     moved = False
     # check if move is valid
@@ -136,7 +140,7 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
         # check for pawn promotion
         if coord[0]!=new_coord[0] and state[coord] in [1,7] and (new_coord[0]==0 or new_coord[0]==7):
             if opponent:
-                poption = getRandomPromotion(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
+                poption = engine.getRandomPromotion(state, ep, castle)
             else:
                 while True:
                     logConsole("Pawn promotion! Enter option (0=bishop, 1=knight, 2=rook, 3=queen) and press any key to continue...")
@@ -188,10 +192,6 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
                 score[1] += points
             else:
                 score[0] += points
-            if orientation=="black":
-                logConsole("Black = {0}          White = {1}".format(score[0], score[1]))
-            else:
-                logConsole("White = {0}          Black = {1}".format(score[0], score[1]))
         if poption is not None:
             if poption==0:
                 state[new_coord] = 4+((state[coord]//7)*6)
@@ -208,16 +208,28 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent=
         moved = True
     return ep, coord, moved
 
-def drawBoard(state, screen, chessbg, offs, clock):
+def drawBoard(args, state, screen, chessbg, offs, gameclock, clocks, score):
+    screen.fill(pygame.Color("black"))
     # set background
-    screen.blit(chessbg, (0,0))
+    xoff = S_SIZE[args.size][0]//12
+    screen.blit(chessbg, (0,xoff))
     updateBoard(state, S_OFFSET[args.size], screen)
+    # create font instance for game info
+    font = pygame.font.Font(pygame.font.get_default_font(), S_TEXTSIZE[args.size][0])
+    # print info opponent
+    info_opponent = str(time.strftime('%H:%M:%S', time.gmtime(clocks[1].get_remaining_time())))+"   ({0})".format(score[1])
+    text_surface = font.render(info_opponent, False, (255, 255, 255))
+    screen.blit(text_surface, dest=(S_TEXTSIZE[args.size][1], S_TEXTSIZE[args.size][2]))
+    # print info player
+    info_player = str(time.strftime('%H:%M:%S', time.gmtime(clocks[0].get_remaining_time())))+"   ({0})".format(score[0])
+    text_surface = font.render(info_player, False, (255, 255, 255))
+    screen.blit(text_surface, dest=(S_TEXTSIZE[args.size][1],S_SIZE[args.size][0]+xoff+S_TEXTSIZE[args.size][2]))
     # update screen
     pygame.display.update()
     # wait fps seconds
-    clock.tick(args.fps)
+    gameclock.tick(args.fps)
 
-def checkGameEvent(color, state, orientation, ep, castle):
+def checkGameEvent(color, state, orientation, ep, castle, clocks):
     # is checked?
     checked = isChecked(color, state, orientation, ep, castle)
     # is stalemated?
@@ -225,19 +237,26 @@ def checkGameEvent(color, state, orientation, ep, castle):
     if checked and not stalemated:
         logConsole('King {0} is checked!'.format(color))
     elif not checked and stalemated:
+        clocks[0].cancel()
+        clocks[1].cancel()
         logConsole('King {0} is stalemated! Draw!'.format(color))
         input("Press any key to exit game...")
         sys.exit()
     elif checked and stalemated:
+        clocks[0].cancel()
+        clocks[1].cancel()
         logConsole('Checkmate! Player {0} has won!'.format(("white" if color=="black" else "black")))
         input("Press any key to exit game...")
         sys.exit() 
 
 def main(args):  
+    # welcome message
+    logConsole("\n-------------------\n| CHESS GAME v1.0 |\n-------------------\n\n")
     # init pygame
     pygame.init()
     # screen/window setup
-    screen = pygame.display.set_mode(S_SIZE[args.size])
+    size_screen = (S_SIZE[args.size][0], S_SIZE[args.size][0]+(S_SIZE[args.size][0]//6))
+    screen = pygame.display.set_mode((size_screen))
     pygame.display.set_caption("Simple Chess")
     # init background and state
     state = np.zeros((8,8),dtype=np.int)
@@ -265,15 +284,17 @@ def main(args):
     # init sprites
     initSprites(args)
     # init clock for fps
-    clock = pygame.time.Clock()
+    gameclock = pygame.time.Clock()
+    # init game engine
+    if args.level == 0:
+        engine = RandomEngine(("white" if orientation=="black" else "black"), orientation)
     # game loop
     score = [0, 0]
     moved = False
     coord = (-1,-1)
     ep = None
     castle = [False]*6
-    # draw initial board
-    drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+    # init game timers
     timer_player_exceeded = threading.Event()
     timer_opponent_exceeded = threading.Event()
     clock_player = Clock(args.timeout*60, lambda x: x.set(), [timer_player_exceeded])
@@ -286,23 +307,20 @@ def main(args):
         clock_player.start()
         clock_opponent.start()
         clock_opponent.pause()
+    # draw initial board
+    drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
     while True:   
         if orientation == "black":
             if coord != (-1,-1):
                 time.sleep(1)
-            comp, pos = getRandomMove("white", state, orientation, ep, castle) 
-            ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
-            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+            comp, pos = engine.getMove(state, ep, castle)
+            ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True, engine)
+            drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
             # check for game event
-            checkGameEvent("black", state, orientation, ep, castle)
+            checkGameEvent("black", state, orientation, ep, castle, [clock_player, clock_opponent])
             clock_opponent.pause()
             clock_player.resume()
         while not moved and not timer_opponent_exceeded.is_set() and not timer_player_exceeded.is_set():
-            sys.stdout.write('\r')
-            time_rem_player = time.strftime('%H:%M:%S', time.gmtime(clock_player.get_remaining_time())) 
-            time_rem_opponent = time.strftime('%H:%M:%S', time.gmtime(clock_opponent.get_remaining_time())) 
-            sys.stdout.write("clock player : {0}        clock opponent : {1}".format(time_rem_player, time_rem_opponent)) 
-            sys.stdout.flush()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: 
                     clock_player.cancel()
@@ -324,10 +342,10 @@ def main(args):
                         new_coord = int((mouseposxy[1]-S_OFFSET[args.size][1])//S_OFFSET[args.size][2]), int((mouseposxy[0]-S_OFFSET[args.size][0])//S_OFFSET[args.size][2])
                         # move component in case of new position which is valid
                         if coord != new_coord and isValidMousePosition(mouseposxy, S_OFFSET[args.size]):
-                            ep, coord, moved = applyMove(coord, new_coord, state, score, orientation, ep, castle, False)
-            drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+                            ep, coord, moved = applyMove(coord, new_coord, state, score, orientation, ep, castle, False, engine)
+            drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
             # check for game event
-            checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle)
+            checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle, [clock_player, clock_opponent])
         # check if loop was terminated due to exceeded timers
         if timer_player_exceeded.is_set():
             clock_opponent.cancel()
@@ -348,11 +366,11 @@ def main(args):
             moved = False
             if orientation == "white":
                 time.sleep(1)
-                comp, pos = getRandomMove("black", state, orientation, ep, castle) 
-                ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True)
-                drawBoard(state, screen, chessbg, S_OFFSET[args.size], clock)
+                comp, pos = engine.getMove(state, ep, castle)
+                ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True, engine)
+                drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
                 # check for game event
-                checkGameEvent("white", state, orientation, ep, castle)
+                checkGameEvent("white", state, orientation, ep, castle, [clock_player, clock_opponent])
                 clock_opponent.pause()
                 clock_player.resume()
     # end game
@@ -362,6 +380,7 @@ if __name__=='__main__':
     screensize = ["small", "medium", "large"]
     colour = ["black", "white", "random"]
     parser = argparse.ArgumentParser(description="Simple Chess") 
+    parser.add_argument("-l", "--level", dest="level", type=int, default=0)
     parser.add_argument("-t", "--timer", dest="timeout", type=int, default=10)
     parser.add_argument("-s", "--size", dest='size', default="medium", choices=screensize)
     parser.add_argument("-c", "--colour", dest="colour", default="random", choices=colour)
