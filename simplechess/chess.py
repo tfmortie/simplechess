@@ -303,10 +303,10 @@ def main(args):
     if args.level == 0:
         engine = RandomEngine(("white" if orientation=="black" else "black"), orientation)
     # init chess clocks
-    timer_player_exceeded = threading.Event()
-    timer_opponent_exceeded = threading.Event()
-    clock_player = Clock(args.timeout*60, timer_player_exceeded, lambda x: x.set())
-    clock_opponent = Clock(args.timeout*60, timer_opponent_exceeded, lambda x: x.set())
+    clock_player_exceeded = threading.Event()
+    clock_opponent_exceeded = threading.Event()
+    clock_player = Clock(args.timeout*60, clock_player_exceeded, lambda x: x.set())
+    clock_opponent = Clock(args.timeout*60, clock_opponent_exceeded, lambda x: x.set())
     # start the clocks
     if orientation=="black":
         clock_opponent.start()
@@ -326,7 +326,7 @@ def main(args):
             checkGameEvent("black", state, orientation, ep, castle, [clock_player, clock_opponent])
             clock_opponent.pause()
             clock_player.resume()
-        while not moved and not timer_opponent_exceeded.is_set() and not timer_player_exceeded.is_set():
+        while not moved and not clock_opponent_exceeded.is_set() and not clock_player_exceeded.is_set():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: 
                     clock_player.cancel()
@@ -352,21 +352,21 @@ def main(args):
             drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
             # check for game event
             checkGameEvent(("white" if orientation=="black" else "black"), state, orientation, ep, castle, [clock_player, clock_opponent])
-        # check if loop was terminated due to exceeded timers
-        if timer_player_exceeded.is_set():
+        # check if loop was terminated due to exceeded clocks
+        if clock_player_exceeded.is_set():
             clock_opponent.cancel()
             clock_player.cancel()
             logConsole('King {0} won in time!'.format(("white" if orientation=="black" else "black")))
             input("Press any key to exit game...")
             sys.exit()
-        elif timer_opponent_exceeded.is_set():
+        elif clock_opponent_exceeded.is_set():
             clock_opponent.cancel()
             clock_player.cancel()
             logConsole('King {0} won in time!'.format(orientation))
             input("Press any key to exit game...")
             sys.exit()
         else:
-            # pause timer of player
+            # pause clock of player
             clock_player.pause()
             clock_opponent.resume()
             moved = False
