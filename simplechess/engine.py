@@ -7,7 +7,6 @@ import random
 
 from logic import getComponents, getValidPositions, isCheck
 
-
 class RandomEngine:
     def __init__(self, color, orientation):
         self.color = color

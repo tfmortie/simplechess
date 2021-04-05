@@ -4,8 +4,10 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) add intelligence (idea: use different levels: free, low, medium, high, ...)
-    2) improve GUI (eg. logging and messaging via GUI instead of console)
+    1) Add intelligence (by using different levels) on top of random engine
+    2) (E) Additional GUI features: 
+        * logging via GUI (eg. window) 
+        * arguments via menu instead of command-line
 """
 import sys
 import os
@@ -47,13 +49,13 @@ IND_2_P = ["bpawn", "brook", "bknight", "bbishop", "bqueen", "bking", "wpawn", "
 P_SPRITE = {}
 
 class Clock:
-    def __init__(self, timeout, callback, args):
-        self.timer = Timer(timeout, callback, args)
+    def __init__(self, timeout, tevent, callback):
+        self.timer = Timer(timeout, callback, [tevent])
         self.start_time = None
         self.cancel_time = None
         self.timeout = timeout
+        self.tevent = tevent
         self.callback = callback
-        self.args = args
 
     def cancel(self):
         self.timer.cancel()
@@ -68,16 +70,22 @@ class Clock:
 
     def resume(self):
         self.timeout = self.get_remaining_time()
-        self.timer = Timer(self.timeout, self.callback, self.args)
+        self.timer = Timer(self.timeout, self.callback, [self.tevent])
         self.start_time = time.time()
         self.timer.start()
         self.cancel_time = None
 
     def get_remaining_time(self):
-        if self.cancel_time is not None and self.start_time is not None:
-            return self.timeout - (self.cancel_time - self.start_time)
+        if not self.tevent.is_set():
+            if self.cancel_time is not None and self.start_time is not None:
+                return self.timeout - (self.cancel_time - self.start_time)
+            else:
+                if self.cancel_time is None and self.start_time is None:
+                    return self.timeout
+                else:
+                    return self.timeout - (time.time() - self.start_time)
         else:
-            return self.timeout - (time.time() - self.start_time)
+            return 0
 
 def logConsole(s):
     sys.stdout.write(s)
@@ -285,30 +293,28 @@ def main(args):
     initSprites(args)
     # init clock for fps
     gameclock = pygame.time.Clock()
-    # init game engine
-    if args.level == 0:
-        engine = RandomEngine(("white" if orientation=="black" else "black"), orientation)
-    # game loop
+    # init state vars
     score = [0, 0]
     moved = False
     coord = (-1,-1)
     ep = None
     castle = [False]*6
-    # init game timers
+    # init game engine
+    if args.level == 0:
+        engine = RandomEngine(("white" if orientation=="black" else "black"), orientation)
+    # init chess clocks
     timer_player_exceeded = threading.Event()
     timer_opponent_exceeded = threading.Event()
-    clock_player = Clock(args.timeout*60, lambda x: x.set(), [timer_player_exceeded])
-    clock_opponent = Clock(args.timeout*60, lambda x: x.set(), [timer_opponent_exceeded])
+    clock_player = Clock(args.timeout*60, timer_player_exceeded, lambda x: x.set())
+    clock_opponent = Clock(args.timeout*60, timer_opponent_exceeded, lambda x: x.set())
+    # start the clocks
     if orientation=="black":
         clock_opponent.start()
-        clock_player.start()
-        clock_player.pause()
     else:
         clock_player.start()
-        clock_opponent.start()
-        clock_opponent.pause()
     # draw initial board
     drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
+    # game loop
     while True:   
         if orientation == "black":
             if coord != (-1,-1):
