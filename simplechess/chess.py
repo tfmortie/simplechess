@@ -20,7 +20,7 @@ import threading
 import numpy as np
 
 from logic import isValidComponentPosition, isChecked, isStalemated
-from engine import RandomEngine
+from engine import RandomEngine, ABPEngine
 from threading import Timer
 
 S_OFFSET = {
@@ -148,7 +148,7 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent,
         # check for pawn promotion
         if coord[0]!=new_coord[0] and state[coord] in [1,7] and (new_coord[0]==0 or new_coord[0]==7):
             if opponent:
-                poption = engine.getRandomPromotion(state, ep, castle)
+                poption = engine.getPromotion()
             else:
                 while True:
                     logConsole("Pawn promotion! Enter option (0=bishop, 1=knight, 2=rook, 3=queen) and press any key to continue...")
@@ -302,6 +302,8 @@ def main(args):
     # init game engine
     if args.level == 0:
         engine = RandomEngine(("white" if orientation=="black" else "black"), orientation)
+    else:
+        engine = ABPEngine(("white" if orientation=="black" else "black"), orientation, args.level)
     # init chess clocks
     clock_player_exceeded = threading.Event()
     clock_opponent_exceeded = threading.Event()
