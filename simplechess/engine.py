@@ -6,14 +6,14 @@ Date: March 2021
 import random
 import math
 
-from logic import getComponents, getValidPositions, isCheck
+from logic import getComponents, getValidPositions, isCheck, isStalemated
 
 class RandomEngine:
     def __init__(self, color, orientation):
         self.color = color
         self.orientation = orientation
 
-    def getMove(self, state, ep, castle):
+    def getMove(self, state, score, ep, castle):
         comp, pos = None, None
         # get components and shuffle
         comps = getComponents(self.color, state)
@@ -39,16 +39,16 @@ class RandomEngine:
 
 class ABPEngine:
     def __init__(self, color, orientation, depth):
-        self.color = color # represents the color of the opponent
+        self.color = color  # represents the color of the opponent
         self.orientation = orientation
         self.depth = depth
 
-    def getMove(self, state, ep, castle):
+    def getMove(self, state, score, ep, castle):
         best_move_score, best_move_comp, best_move_pos = math.inf*-1, None, None
         # get all possible moves (ie. states)
-        states = self.getStates(self.color, np.copy(state), ep, castle)
-        for (c,p,s,ep,castle) in states: 
-            score = self.alphabeta(s, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
+        states = self.getStates(self.color, state, score, ep, castle)
+        for (c,p,s,score,ep,castle) in states: 
+            score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
             # did we find an improved move?
             if score > best_move_score:
                 best_move_score = score
@@ -57,8 +57,60 @@ class ABPEngine:
 
         return best_move_comp, best_move_pos 
 
-    def alphabeta(self, state, color, ep, castle, depth, alpha, beta, maxp):
-        return None
+    def alphabeta(self, state, score, color, ep, castle, depth, alpha, beta, maxp):
+        """
+          state : the (current) state of game 
+          score : list of scores for both opponents for current state
+          color : the current player for which we would like to calculate possible moves and scores
+          ep : state for en-passant
+          castle : state for castling
+          depth : current depth in game tree
+          alpha : alpha score
+          beta : beta score
+          maxp : is current player the maximizing player?
+        """
+        # is current node in check?
+        checked = isChecked(color, state, self.orientation, ep, castle)
+        # is current node stalemated?
+        stalemated = isStalemated(color, state, self.orientation, ep, castle)
+        if depth == 0 or (checked and stalemated):
+            # we reached a terminal node (either due to depth=0 or checkmate)
+            if (checked and stalemated):
+                return 100 # perhaps this value is rather arbitrary
+            else:
+                return (score[0] if not maxp else score[1])
+        if maxp:
+            # opponent's turn
+            value = math.inf*-1
+            # get all possible moves 
+            states = self.getStates(self.color, np.copy(state), ep.copy(), castle.copy())
+            for (c,p,s,score,ep,castle) in states: 
+                score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
+                value = max(value, score)
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+            return value
+        else:
+                    
+            
+            
+        
+        
+        best_move_score, best_move_comp, best_move_pos = math.inf*-1, None, None
+        # get all possible moves (ie. states)
+        states = self.getStates(self.color, np.copy(state), ep, castle)
+        for (c,p,s,score,ep,castle) in states: 
+            score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
+            # did we find an improved move?
+            if score > best_move_score:
+                best_move_score = score
+                best_move_comp = c
+                best_move_pos = p
+
+
+        else:
+            # our turn
         """
         if depth == 0 or node is a terminal node then
             return the heuristic value of node
@@ -80,7 +132,7 @@ class ABPEngine:
             return value
         """
 
-    def getStates(self, color, state, ep, castle):
+    def getStates(self, color, state, score, ep, castle):
         # init states
         ret_states = []
         # get all possible components
@@ -89,7 +141,7 @@ class ABPEngine:
         for c in comps:
             c_pos = getValidPositions(c, state, self.orientation, ep, castle)
             for cp in c_pos:
-                ret_states.append(self.applyMove(c, cp, np.copy(state), self.orientation, ep, castle, ("black" if color=="white" else "white"))
+                ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, ep.copy(), castle.copy(), (color==self.color))
 )        
         return ret_states
 
@@ -111,6 +163,7 @@ class ABPEngine:
         score: score for both players after new position have been applied
         ep: en passant state
         castle: castle state
+        opponent: boolean 
         """
         poption = None
         # checks for double pawn or en passant 
@@ -180,7 +233,7 @@ class ABPEngine:
         else:
             state[comppos] = state[comp]
         state[comp] = 0 
-      return comp, comppos, state, score, ep, castle
+        return comp, comppos, state, score, ep, castle
 
 """
 function alphabeta(node, depth, α, β, maximizingPlayer) is
