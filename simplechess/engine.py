@@ -8,7 +8,7 @@ import math
 
 import numpy as np
 
-from logic import getComponents, getValidPositions, isChecked, isStalemated
+from logic import getComponents, getValidPositions, isCheck, isChecked, isStalemated
 
 class RandomEngine:
     def __init__(self, color, orientation):
@@ -77,7 +77,7 @@ class ABPEngine:
             if (checked and stalemated):
                 return comp, comppos, 100
             else:
-                return comp, comppos, (score[0] if not maxp else score[1])
+                return comp, comppos, (score[1] if not maxp else score[0])
         if maxp:
             # opponent's turn
             best_c, best_cp, best_value = None, None, math.inf*-1
@@ -134,6 +134,7 @@ class ABPEngine:
                 else:
                     ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, None, castle.copy(), (color==self.color)))
 
+        random.shuffle(ret_states)
         return ret_states
 
     def getPromotion(self):
@@ -164,7 +165,7 @@ class ABPEngine:
         poption = None
         # checks for double pawn or en passant 
         if comppos[1]==comp[1] and abs(comppos[0]-comp[0])==2 and state[comp] in [1,7]:
-            ep = comppos
+            ep = list(comppos)
         elif state[comp] in [1,7] and state[comppos]==0 and comppos[0]!=comp[0] and comppos[1]!=comp[1] and ep!=None:
             # en passant move
             if comppos[0] > comp[0]:

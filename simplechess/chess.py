@@ -135,7 +135,7 @@ def applyMove(coord, new_coord, state, score, orientation, ep, castle, opponent,
     if valid_move:
         # checks for double pawn or en passant 
         if new_coord[1]==coord[1] and abs(new_coord[0]-coord[0])==2 and state[coord] in [1,7]:
-            ep = new_coord
+            ep = list(new_coord)
         elif state[coord] in [1,7] and state[new_coord]==0 and new_coord[0]!=coord[0] and new_coord[1]!=coord[1] and ep!=None:
             # en passant move
             if new_coord[0] > coord[0]:
