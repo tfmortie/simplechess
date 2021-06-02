@@ -6,7 +6,9 @@ Date: March 2021
 import random
 import math
 
-from logic import getComponents, getValidPositions, isCheck, isStalemated
+import numpy as np
+
+from logic import getComponents, getValidPositions, isChecked, isStalemated
 
 class RandomEngine:
     def __init__(self, color, orientation):
@@ -44,30 +46,27 @@ class ABPEngine:
         self.depth = depth
 
     def getMove(self, state, score, ep, castle):
-        best_move_score, best_move_comp, best_move_pos = math.inf*-1, None, None
-        # get all possible moves (ie. states)
-        states = self.getStates(self.color, state, score, ep, castle)
-        for (c,p,s,score,ep,castle) in states: 
-            score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
-            # did we find an improved move?
-            if score > best_move_score:
-                best_move_score = score
-                best_move_comp = c
-                best_move_pos = p
+        c, ps, score = self.alphabeta(state, None, None, score, self.color, ep, castle, self.depth, math.inf*-1, math.inf, True)
+        return c, ps
 
-        return best_move_comp, best_move_pos 
-
-    def alphabeta(self, state, score, color, ep, castle, depth, alpha, beta, maxp):
+    def alphabeta(self, state, comp, comppos, score, color, ep, castle, depth, alpha, beta, maxp):
         """
-          state : the (current) state of game 
-          score : list of scores for both opponents for current state
-          color : the current player for which we would like to calculate possible moves and scores
-          ep : state for en-passant
-          castle : state for castling
-          depth : current depth in game tree
-          alpha : alpha score
-          beta : beta score
-          maxp : is current player the maximizing player?
+        Arguments:
+            state : the (current) state of game 
+            comp : the component of current state
+            comppos : the position of current state
+            score : list of scores for both opponents for current state
+            color : the current player for which we would like to calculate possible moves and scores
+            ep : state for en-passant
+            castle : state for castling
+            depth : current depth in game tree
+            alpha : alpha score
+            beta : beta score
+            maxp : is current player the maximizing player?
+        Return:
+            best_move_comp : component of best move
+            best_move_pos : position of best move
+            score : score of best move
         """
         # is current node in check?
         checked = isChecked(color, state, self.orientation, ep, castle)
@@ -76,63 +75,52 @@ class ABPEngine:
         if depth == 0 or (checked and stalemated):
             # we reached a terminal node (either due to depth=0 or checkmate)
             if (checked and stalemated):
-                return 100 # perhaps this value is rather arbitrary
+                return comp, comppos, 100
             else:
-                return (score[0] if not maxp else score[1])
+                return comp, comppos, (score[0] if not maxp else score[1])
         if maxp:
             # opponent's turn
-            value = math.inf*-1
+            best_c, best_cp, best_value = None, None, math.inf*-1
             # get all possible moves 
-            states = self.getStates(self.color, np.copy(state), ep.copy(), castle.copy())
-            for (c,p,s,score,ep,castle) in states: 
-                score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
-                value = max(value, score)
-                alpha = max(alpha, value)
+            states = self.getStates(color, state, score, ep, castle)
+            for st in states: 
+                c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
+                if s > best_value:
+                    best_value = s
+                    best_c = c
+                    best_cp = cp
+                alpha = max(alpha, best_value)
                 if alpha >= beta:
                     break
-            return value
-        else:
-                    
-            
-            
-        
-        
-        best_move_score, best_move_comp, best_move_pos = math.inf*-1, None, None
-        # get all possible moves (ie. states)
-        states = self.getStates(self.color, np.copy(state), ep, castle)
-        for (c,p,s,score,ep,castle) in states: 
-            score = self.alphabeta(s, score, ("white" if self.color=="black" else "black"), ep, castle, self.depth-1, math.inf*-1, math.inf, False)
-            # did we find an improved move?
-            if score > best_move_score:
-                best_move_score = score
-                best_move_comp = c
-                best_move_pos = p
-
-
+            return best_c, best_cp, best_value 
         else:
             # our turn
-        """
-        if depth == 0 or node is a terminal node then
-            return the heuristic value of node
-        if maxp:
-            value = math.inf*-1
-            for each child of node do
-                value := max(value, alphabeta(child, depth − 1, α, β, FALSE))
-                α := max(α, value)
-                if α ≥ β then
-                    break (* β cutoff *)
-            return value
-        else:
-            value := +∞
-            for each child of node do
-                value := min(value, alphabeta(child, depth − 1, α, β, TRUE))
-                β := min(β, value)
-                if β ≤ α then
-                    break (* α cutoff *)
-            return value
-        """
-
+            best_c, best_cp, best_value = None, None, math.inf
+            # get all possible moves 
+            states = self.getStates(color, state, score, ep, castle)
+            #for (c,p,s,score,ep,castle) in states: 
+            for st in states: 
+                c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, True) 
+                if s < best_value:
+                    best_value = s
+                    best_c = c
+                    best_cp = cp
+                beta = min(beta, best_value)
+                if beta <= alpha:
+                    break
+            return best_c, best_cp, best_value 
+            
     def getStates(self, color, state, score, ep, castle):
+        """
+        Arguments:
+            color : the current player for which we would like to calculate possible moves and scores
+            state : the (current) state of game 
+            score : list of scores for both opponents for current state
+            ep : state for en-passant
+            castle : state for castling
+        Return:
+            ret_states : list of (c, p, s, score, ep, castle)-tuples 
+        """
         # init states
         ret_states = []
         # get all possible components
@@ -141,29 +129,37 @@ class ABPEngine:
         for c in comps:
             c_pos = getValidPositions(c, state, self.orientation, ep, castle)
             for cp in c_pos:
-                ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, ep.copy(), castle.copy(), (color==self.color))
-)        
+                if ep is not None:
+                    ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, ep.copy(), castle.copy(), (color==self.color)))        
+                else:
+                    ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, None, castle.copy(), (color==self.color)))
+
         return ret_states
 
     def getPromotion(self):
-        # just pick queen
+        # just pick queen (TODO could be improved)
         return 3
-
-    def getScoreState(state, color):
-        """ return score of a particular state for opponent color """
-        return 0
 
     def applyMove(self, comp, comppos, state, score, orientation, ep, castle, opponent):
         """
-        return needs following format: (c,p,s,ep,castle)
-        with 
-        c: (x,y) the component which moves 
-        p: (x,y) the new position for component
-        s: state after new position have been applied
-        score: score for both players after new position have been applied
-        ep: en passant state
-        castle: castle state
-        opponent: boolean 
+        Important: arguments that are going to be modified: state, score, ep, castle 
+
+        Arguments:
+            comp : component of move to be applied
+            comppos : new position of component
+            state : the (current, ie, before new move) state of game
+            score : list of scores for both opponents for current (ie, before new move) state
+            orientation : orientation of the game 
+            ep : current (ie, before new move) state for en-passant
+            castle : current (ie, before new move) state for castling
+            opponent : whether the component of the applied move represents a component of the opponent 
+        Return:
+            comp : component of move applied
+            comppos : position of applied move of component
+            state : new state of game after applied move 
+            score : new score of game after applied move 
+            ep : new ep state of game after applied move
+            castle : new castle state of game after applied move
         """
         poption = None
         # checks for double pawn or en passant 
@@ -234,25 +230,3 @@ class ABPEngine:
             state[comppos] = state[comp]
         state[comp] = 0 
         return comp, comppos, state, score, ep, castle
-
-"""
-function alphabeta(node, depth, α, β, maximizingPlayer) is
-    if depth = 0 or node is a terminal node then
-        return the heuristic value of node
-    if maximizingPlayer then
-        value := −∞
-        for each child of node do
-            value := max(value, alphabeta(child, depth − 1, α, β, FALSE))
-            α := max(α, value)
-            if α ≥ β then
-                break (* β cutoff *)
-        return value
-    else
-        value := +∞
-        for each child of node do
-            value := min(value, alphabeta(child, depth − 1, α, β, TRUE))
-            β := min(β, value)
-            if β ≤ α then
-                break (* α cutoff *)
-        return value
-"""

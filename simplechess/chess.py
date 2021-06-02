@@ -321,7 +321,7 @@ def main(args):
         if orientation == "black":
             if coord != (-1,-1):
                 time.sleep(1)
-            comp, pos = engine.getMove(state, ep, castle)
+            comp, pos = engine.getMove(state, score, ep, castle)
             ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True, engine)
             drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
             # check for game event
@@ -374,7 +374,7 @@ def main(args):
             moved = False
             if orientation == "white":
                 time.sleep(1)
-                comp, pos = engine.getMove(state, ep, castle)
+                comp, pos = engine.getMove(state, score, ep, castle)
                 ep, coord, _ = applyMove(comp, pos, state, score, orientation, ep, castle, True, engine)
                 drawBoard(args, state, screen, chessbg, S_OFFSET[args.size], gameclock, [clock_player, clock_opponent], score)
                 # check for game event
