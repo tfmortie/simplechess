@@ -85,6 +85,8 @@ class ABPEngine:
                 best_c, best_cp, best_value = None, None, math.inf*-1
                 # get all possible moves 
                 states = self.getStates(color, state, score, ep, castle)
+                # sort in decreasing order (max-player) in order to improve runtime
+                states = sorted(states, key=lambda x: x[3])[::-1]
                 for st in states: 
                     c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
                     if s > best_value:
@@ -100,6 +102,8 @@ class ABPEngine:
                 best_value = math.inf*-1
                 # get all possible moves 
                 states = self.getStates(color, state, score, ep, castle)
+                # sort in decreasing order (max-player) in order to improve runtime
+                states = sorted(states, key=lambda x: x[3])[::-1]
                 for st in states: 
                     c, cp, s = self.alphabeta(st[2], comp, comppos, st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
                     if s > best_value:
@@ -113,7 +117,8 @@ class ABPEngine:
             best_c, best_cp, best_value = None, None, math.inf
             # get all possible moves 
             states = self.getStates(color, state, score, ep, castle)
-            #for (c,p,s,score,ep,castle) in states: 
+            # sort in increasing order (min-player)  in order to improve runtime
+            states = sorted(states, key=lambda x: x[3])
             for st in states: 
                 c, cp, s = self.alphabeta(st[2], comp, comppos, st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, True) 
                 if s < best_value:

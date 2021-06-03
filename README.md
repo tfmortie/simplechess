@@ -26,7 +26,7 @@ Optional arguments:
   -t TIMEOUT, --timer TIMEOUT                             timer (in min.) for both players (default 10)
   -s {small,medium,large}, --size {small,medium,large}    size of board (default medium)
   -c {black,white,random}, --colour {black,white,random}  colour player (default random)
-  -f FPS, --fps FPS                                       fps game
+  -f FPS, --fps FPS                                       fps game (default 60)
 ```
 
 ![simple chess](simplechess.png "Simple chess")
