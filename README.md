@@ -1,5 +1,7 @@
 # Simple Chess
 
+![simple chess](simplechess.png "Simple chess")
+
 A simple chess game written in Python. The chess engine makes use of alpha-beta pruning together with simple heuristics.
 
 ## Dependencies
@@ -28,5 +30,3 @@ Optional arguments:
   -c {black,white,random}, --colour {black,white,random}  colour player (default random)
   -f FPS, --fps FPS                                       fps game
 ```
-
-![simple chess](simplechess.png "Simple chess")
