@@ -259,7 +259,7 @@ def checkGameEvent(color, state, orientation, ep, castle, clocks):
 
 def main(args):  
     # welcome message
-    logConsole("\n-------------------\n| CHESS GAME v1.0 |\n-------------------\n\n")
+    logConsole("\n--------------------\n| SIMPLE CHESS v1.0 |\n--------------------\n\n")
     # init pygame
     pygame.init()
     # screen/window setup

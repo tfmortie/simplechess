@@ -77,22 +77,37 @@ class ABPEngine:
             if (checked and stalemated):
                 return comp, comppos, 100
             else:
-                return comp, comppos, (score[1] if not maxp else score[0])
+                #return comp, comppos, (score[1] if not maxp else score[0])
+                return comp, comppos, score[1]-score[0]
         if maxp:
-            # opponent's turn
-            best_c, best_cp, best_value = None, None, math.inf*-1
-            # get all possible moves 
-            states = self.getStates(color, state, score, ep, castle)
-            for st in states: 
-                c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
-                if s > best_value:
-                    best_value = s
-                    best_c = c
-                    best_cp = cp
-                alpha = max(alpha, best_value)
-                if alpha >= beta:
-                    break
-            return best_c, best_cp, best_value 
+            if depth==self.depth:
+                # opponent's turn
+                best_c, best_cp, best_value = None, None, math.inf*-1
+                # get all possible moves 
+                states = self.getStates(color, state, score, ep, castle)
+                for st in states: 
+                    c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
+                    if s > best_value:
+                        best_value = s
+                        best_c = c
+                        best_cp = cp
+                    alpha = max(alpha, best_value)
+                    if alpha >= beta:
+                        break
+                return best_c, best_cp, best_value 
+            else:
+                # opponent's turn
+                best_value = math.inf*-1
+                # get all possible moves 
+                states = self.getStates(color, state, score, ep, castle)
+                for st in states: 
+                    c, cp, s = self.alphabeta(st[2], comp, comppos, st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, False) 
+                    if s > best_value:
+                        best_value = s
+                    alpha = max(alpha, best_value)
+                    if alpha >= beta:
+                        break
+                return comp, comppos, best_value 
         else:
             # our turn
             best_c, best_cp, best_value = None, None, math.inf
@@ -100,7 +115,7 @@ class ABPEngine:
             states = self.getStates(color, state, score, ep, castle)
             #for (c,p,s,score,ep,castle) in states: 
             for st in states: 
-                c, cp, s = self.alphabeta(st[2], st[0], st[1], st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, True) 
+                c, cp, s = self.alphabeta(st[2], comp, comppos, st[3], ("white" if color=="black" else "black"), st[4], st[5], depth-1, alpha, beta, True) 
                 if s < best_value:
                     best_value = s
                     best_c = c
@@ -129,10 +144,12 @@ class ABPEngine:
         for c in comps:
             c_pos = getValidPositions(c, state, self.orientation, ep, castle)
             for cp in c_pos:
-                if ep is not None:
-                    ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, ep.copy(), castle.copy(), (color==self.color)))        
-                else:
-                    ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, None, castle.copy(), (color==self.color)))
+                # also check whether the current move does not lead to a check
+                if not isCheck(c, cp, state, self.orientation):
+                    if ep is not None:
+                        ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, ep.copy(), castle.copy(), (color==self.color)))        
+                    else:
+                        ret_states.append(self.applyMove(c, cp, np.copy(state), score.copy(), self.orientation, None, castle.copy(), (color==self.color)))
 
         random.shuffle(ret_states)
         return ret_states
@@ -177,7 +194,7 @@ class ABPEngine:
             ep = None
         # check for pawn promotion
         if comp[0]!=comppos[0] and state[comp] in [1,7] and (comppos[0]==0 or comppos[0]==7): 
-            poption = self.getPromotion(state, ep, castle)
+            poption = self.getPromotion()
         # check whether we have a rook or king move
         if state[comp] in [2,8]:
             if comp==(0,0):
