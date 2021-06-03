@@ -4,8 +4,7 @@ Author: Thomas Mortier
 Date: March 2021
 
 TODO: 
-    1) Add intelligence (by using different levels) on top of random engine
-    2) (E) Additional GUI features: 
+    * (E) Additional GUI features: 
         * logging via GUI (eg. window) 
         * arguments via menu instead of command-line
 """
