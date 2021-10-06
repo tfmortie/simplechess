@@ -8,7 +8,7 @@ import math
 
 import numpy as np
 
-from logic import getComponents, getValidPositions, isCheck, isChecked, isStalemated
+from simplechess.logic import getComponents, getValidPositions, isCheck, isChecked, isStalemated
 
 class RandomEngine:
     def __init__(self, color, orientation):

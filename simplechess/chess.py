@@ -18,8 +18,8 @@ import threading
 
 import numpy as np
 
-from logic import isValidComponentPosition, isChecked, isStalemated
-from engine import RandomEngine, ABPEngine
+from simplechess.logic import isValidComponentPosition, isChecked, isStalemated
+from simplechess.engine import RandomEngine, ABPEngine
 from threading import Timer
 
 S_OFFSET = {
