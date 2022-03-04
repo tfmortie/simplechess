@@ -14,7 +14,7 @@ Following modules are required:
 Start a game by running the following:
 
 ```
-python -m simplechess.chess
+python -m chess.py
 ```
 
 ### Command line arguments
