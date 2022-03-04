@@ -94,18 +94,18 @@ def logConsole(s):
 def initSprites(args):
     global P_SPRITE
     P_SPRITE = {
-        "bpawn": pygame.transform.scale(pygame.image.load("assets/b_pawn.png"), S_PSIZE[args.size]),
-        "brook": pygame.transform.scale(pygame.image.load("assets/b_rook.png"), S_PSIZE[args.size]),
-        "bknight": pygame.transform.scale(pygame.image.load("assets/b_knight.png"), S_PSIZE[args.size]),
-        "bbishop": pygame.transform.scale(pygame.image.load("assets/b_bishop.png"), S_PSIZE[args.size]),
-        "bqueen": pygame.transform.scale(pygame.image.load("assets/b_queen.png"), S_PSIZE[args.size]),
-        "bking": pygame.transform.scale(pygame.image.load("assets/b_king.png"), S_PSIZE[args.size]),
-        "wpawn": pygame.transform.scale(pygame.image.load("assets/w_pawn.png"), S_PSIZE[args.size]),
-        "wrook": pygame.transform.scale(pygame.image.load("assets/w_rook.png"), S_PSIZE[args.size]),
-        "wknight": pygame.transform.scale(pygame.image.load("assets/w_knight.png"), S_PSIZE[args.size]),
-        "wbishop": pygame.transform.scale(pygame.image.load("assets/w_bishop.png"), S_PSIZE[args.size]),
-        "wqueen": pygame.transform.scale(pygame.image.load("assets/w_queen.png"), S_PSIZE[args.size]),
-        "wking": pygame.transform.scale(pygame.image.load("assets/w_king.png"), S_PSIZE[args.size])}
+        "bpawn": pygame.transform.scale(pygame.image.load("simplechess/assets/b_pawn.png"), S_PSIZE[args.size]),
+        "brook": pygame.transform.scale(pygame.image.load("simplechess/assets/b_rook.png"), S_PSIZE[args.size]),
+        "bknight": pygame.transform.scale(pygame.image.load("simplechess/assets/b_knight.png"), S_PSIZE[args.size]),
+        "bbishop": pygame.transform.scale(pygame.image.load("simplechess/assets/b_bishop.png"), S_PSIZE[args.size]),
+        "bqueen": pygame.transform.scale(pygame.image.load("simplechess/assets/b_queen.png"), S_PSIZE[args.size]),
+        "bking": pygame.transform.scale(pygame.image.load("simplechess/assets/b_king.png"), S_PSIZE[args.size]),
+        "wpawn": pygame.transform.scale(pygame.image.load("simplechess/assets/w_pawn.png"), S_PSIZE[args.size]),
+        "wrook": pygame.transform.scale(pygame.image.load("simplechess/assets/w_rook.png"), S_PSIZE[args.size]),
+        "wknight": pygame.transform.scale(pygame.image.load("simplechess/assets/w_knight.png"), S_PSIZE[args.size]),
+        "wbishop": pygame.transform.scale(pygame.image.load("simplechess/assets/w_bishop.png"), S_PSIZE[args.size]),
+        "wqueen": pygame.transform.scale(pygame.image.load("simplechess/assets/w_queen.png"), S_PSIZE[args.size]),
+        "wking": pygame.transform.scale(pygame.image.load("simplechess/assets/w_king.png"), S_PSIZE[args.size])}
 
 def updateBoard(state, coord, screen):
         start_pos_x, start_pos_y, offset = coord 
@@ -272,7 +272,7 @@ def main(args):
         m = random.choice(["w","b"])
         orientation = "white" if m=="w" else "black"
     if orientation == "black":
-        chessbg = pygame.image.load("assets/backgroundb.png")
+        chessbg = pygame.image.load("simplechess/assets/backgroundb.png")
         # init pawns
         state[6,:] = np.ones(8)
         state[1,:] = np.ones(8)*7
@@ -280,7 +280,7 @@ def main(args):
         state[7,:] = np.array([2,3,4,6,5,4,3,2])
         state[0,:] = np.array([8,9,10,12,11,10,9,8])
     else:
-        chessbg = pygame.image.load("assets/backgroundw.png")
+        chessbg = pygame.image.load("simplechess/assets/backgroundw.png")
         # init pawns
         state[6,:] = np.ones(8)*7
         state[1,:] = np.ones(8)
